@@ -1,44 +1,24 @@
-import OpenAI from "openai";
-import { streamText } from 'ai';
+import OpenAI from 'openai';
+import { NextResponse } from 'next/server';
 
 const openai = new OpenAI({
-    apiKey: process.env.OPENAI_API_KEY || '',
+  apiKey: process.env.OPENAI_API_KEY
 });
 
-export const runtime = 'edge';
-
 export async function POST(req) {
-    try {
-        // Log the request method and headers
-        console.log('Request Method:', req.method);
-        console.log('Request Headers:', req.headers);
+  const { messages } = await req.json();
+  try {
+    const response = await openai.chat.completions.create({
+      model: "gpt-3.5-turbo",
+      messages: messages,
+    });
 
-        // Parse the request body
-        const { messages } = await req.json();
-        console.log('Received messages:', messages);
+    console.log('OpenAI Response:', response); // Log the entire response for debugging
 
-        // Create a completion request to OpenAI
-        const response = await openai.chat.completions.create({
-            model: "gpt-4o-mini",  // Changed model name
-            messages: [
-                { role: "user", content: "You are a good friend" },
-                ...messages,
-            ],
-            stream: true,
-            temperature: 1,
-        });
-
-        // Log the response from OpenAI
-        console.log('OpenAI Response:', response);
-
-        // Return the response as a stream
-        return streamText.toDataStreamResponse(response);
-    } catch (error) {
-        // Log any errors that occur
-        console.error('Error in API route:', error);
-        return new Response(JSON.stringify({ error: error.message }), {
-            status: 500,
-            headers: { 'Content-Type': 'application/json' },
-        });
-    }
+    const result = response.choices[0].message.content;
+    return NextResponse.json({ result });
+  } catch (error) {
+    console.error('Error:', error);
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
 }

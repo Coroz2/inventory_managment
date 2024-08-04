@@ -1,6 +1,7 @@
-'use client'
+'use client';
 import Image from "next/image";
-import { useState, useEffect } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
+import { Camera } from "react-camera-pro";
 import { firestore } from "@/firebase";
 import { Box, Button, Modal, Stack, TextField, Typography, createTheme, ThemeProvider } from '@mui/material';
 import { collection, getDocs, query, getDoc, doc, deleteDoc, setDoc } from "firebase/firestore";
@@ -11,7 +12,7 @@ const style = {
   left: '50%',
   transform: 'translate(-50%, -50%)',
   width: 400,
-  bgcolor: '#424242',
+  bgcolor: '#ffffff',
   border: 'none',
   borderRadius: 8,
   boxShadow: 24,
@@ -19,12 +20,12 @@ const style = {
   display: 'flex',
   flexDirection: 'column',
   gap: 3,
-  color: 'white',
+  color: 'black',
 };
 
-const darkTheme = createTheme({
+const lightTheme = createTheme({
   palette: {
-    mode: 'dark',
+    mode: 'light',
     primary: {
       main: '#90caf9',
     },
@@ -32,15 +33,15 @@ const darkTheme = createTheme({
       main: '#f48fb1',
     },
     alternative: {
-      main: '#81c784',
+      main: '#388e3c',
     },
     background: {
-      default: '#121212',
-      paper: '#424242',
+      default: '#f5f5f5',
+      paper: '#ffffff',
     },
     text: {
-      primary: '#fff',
-      secondary: '#aaa',
+      primary: '#000',
+      secondary: '#555',
     },
   },
   typography: {
@@ -51,6 +52,13 @@ const darkTheme = createTheme({
       styleOverrides: {
         root: {
           borderRadius: 8,
+          '&.MuiButton-containedAlternative': {
+            backgroundColor: '#388e3c',
+            color: 'black', // Set text color to black
+            '&:hover': {
+              backgroundColor: '#2e7d32', // Slightly darker green for hover effect
+            },
+          },
         },
       },
     },
@@ -69,7 +77,9 @@ export default function Home() {
   const [open, setOpen] = useState(false);
   const [itemName, setItemName] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
-  const [cameraOpen, setCameraOpen] = useState(false);
+  const cameraRef = useRef(null);
+  const [image, setImage] = useState(null);
+  const [isCameraOpen, setIsCameraOpen] = useState(false);
 
   const updateInventory = async () => {
     const snapshot = query(collection(firestore, 'inventory'));
@@ -114,33 +124,45 @@ export default function Home() {
   const handleOpen = () => setOpen(true);
   const handleClose = () => setOpen(false);
 
-  const handleCameraOpen = () => setCameraOpen(true);
-  const handleCameraClose = () => setCameraOpen(false);
- 
-
   const filteredInventory = inventory.filter(item =>
     item.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const sendMessageToOpenAI = async () => {
     try {
-        const response = await fetch('/api/openai/', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ messages: [{ role: 'user', content: 'hi' }] }),
-        });
-
-        const data = await response.json();
-        console.log('Response from OpenAI:', data);
+      const response = await fetch('/api/openai', { // Corrected the endpoint path
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ messages: [{ role: 'user', content: 'hi' }] }),
+      });
+  
+      const data = await response.json();
+      console.log('Response from OpenAI:', data);
     } catch (error) {
-        console.error(error);
+      console.error(error);
     }
-};
+  };
+
+  const handleTakePhoto = () => {
+    if (cameraRef.current) {
+      const photo = cameraRef.current.takePhoto();
+      setImage(photo);
+      setIsCameraOpen(false); // Close the camera after taking the photo
+    }
+  };
+
+  const handleOpenCamera = () => {
+    setIsCameraOpen(true);
+  };
+
+  const handleCloseCamera = () => {
+    setIsCameraOpen(false);
+  };
 
   return (
-    <ThemeProvider theme={darkTheme}>
+    <ThemeProvider theme={lightTheme}>
       <Box
         width="100vw"
         height="100vh"
@@ -152,13 +174,46 @@ export default function Home() {
         bgcolor="background.default"
         color="text.primary"
         p={4}
+      >
+        <Modal
+          open={isCameraOpen}
+          onClose={handleCloseCamera}
+          aria-labelledby="camera-modal-title"
+          aria-describedby="camera-modal-description"
         >
+          <Box
+            display="flex"
+            flexDirection="column"
+            alignItems="center"
+            justifyContent="center"
+            gap={2}
+            p={2}
+            bgcolor="background.paper"
+            borderRadius={2}
+            boxShadow={3}
+            maxWidth={400}
+            mx="auto"
+          >
+            <Typography variant="h6" color="text.primary" id="camera-modal-title">
+              Take a Photo
+            </Typography>
+            <Camera ref={cameraRef} aspectRatio={4 / 3} />
+            <Stack direction="row" spacing={2} width="100%">
+              <Button variant="contained" onClick={handleTakePhoto} fullWidth>
+                Take Photo
+              </Button>
+              <Button variant="contained" color="secondary" onClick={handleCloseCamera} fullWidth>
+                Close
+              </Button>
+            </Stack>
+          </Box>
+        </Modal>
         <Modal
           open={open}
           onClose={handleClose}
           aria-labelledby="modal-modal-title"
           aria-describedby="modal-modal-description"
-          >
+        >
           <Box sx={style}>
             <Typography id="modal-modal-title" variant="h6" component="h2">
               Add Item
@@ -171,7 +226,6 @@ export default function Home() {
                 fullWidth
                 value={itemName}
                 onChange={(e) => setItemName(e.target.value)}
-                sx={{ input: { color: 'white' }, label: { color: 'gray' } }}
               />
               <Button
                 variant="contained"
@@ -186,9 +240,19 @@ export default function Home() {
             </Stack>
           </Box>
         </Modal>
-        <Button variant="contained" onClick={handleOpen}>
-          Add New Item
-        </Button>
+        <Stack direction="row" spacing={2}>
+          <Button variant="contained" onClick={handleOpen}>
+            Add New Item
+          </Button>
+          <Button
+            variant="contained"
+            color="alternative"
+            sx={{ color: 'black' }} // Ensure text color is black
+            onClick={handleOpenCamera}
+          >
+            Add with image
+          </Button>
+        </Stack>
         <TextField
           id="search-bar"
           label="Search"
@@ -196,22 +260,22 @@ export default function Home() {
           fullWidth
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
-          sx={{ width: '800px', marginBottom: '20px', input: { color: 'white' }, label: { color: 'gray' } }}
+          sx={{ width: '1200px', marginBottom: '20px' }}
         />
-        <Box border={'1px solid #fff'} borderRadius={4} overflow="hidden" boxShadow={3}>
+        <Box border={'1px solid #ddd'} borderRadius={4} overflow="hidden" boxShadow={3}>
           <Box
-            width="800px"
+            width="1200px"
             height="100px"
-            bgcolor={'#424242'}
+            bgcolor={'#ffffff'}
             display={'flex'}
             justifyContent={'center'}
             alignItems={'center'}
           >
-            <Typography variant={'h4'} color={'#fff'} textAlign={'center'} fontWeight="bold">
-              Inventory Items
+            <Typography variant={'h4'} color={'#000'} textAlign={'center'} fontWeight="bold">
+              My Pantry
             </Typography>
           </Box>
-          <Stack width="800px" maxHeight="300px" spacing={2} overflow={'auto'} p={2}>
+          <Stack width="1200px" maxHeight="300px" spacing={2} overflow={'auto'} p={2}>
             {filteredInventory.map(({ name, quantity }) => (
               <Box
                 key={name}
@@ -220,25 +284,26 @@ export default function Home() {
                 display={'flex'}
                 justifyContent={'space-between'}
                 alignItems={'center'}
-                bgcolor={'#333'}
+                bgcolor={'#f5f5f5'}
                 paddingX={3}
                 borderRadius={2}
                 boxShadow={2}
               >
-                <Typography variant={'h6'} color={'#fff'}>
+                <Typography variant={'h6'} color={'#000'}>
                   {name.charAt(0).toUpperCase() + name.slice(1)}
                 </Typography>
-                <Typography variant={'h6'} color={'#fff'}>
+                <Typography variant={'h6'} color={'#000'}>
                   Quantity: {quantity}
                 </Typography>
                 <Stack direction="row" spacing={2}>
                   <Button variant="contained" color="primary" onClick={() => addItem(name)}>
                     Add
                   </Button>
-                  <Button variant="contained" color="alternative" onClick={() => setCameraOpen(true)}>
-                    Add with image
-                  </Button>
-                  <Button variant="contained" color="secondary" onClick={() => removeItem(name)}>
+                  <Button
+                    variant="contained"
+                    color="secondary"
+                    onClick={() => removeItem(name)}
+                  >
                     Remove
                   </Button>
                 </Stack>
@@ -246,6 +311,7 @@ export default function Home() {
             ))}
           </Stack>
         </Box>
+        {image && <img src={image} alt="Taken photo" />}
         <Button variant="contained" onClick={sendMessageToOpenAI}>
           Send Hi to OpenAI
         </Button>
