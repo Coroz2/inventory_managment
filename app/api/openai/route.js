@@ -13,7 +13,7 @@ export async function POST(req) {
       messages: messages,
     });
 
-    console.log('OpenAI Response:', response); // Log the entire response for debugging
+    console.log('OpenAI Response:', response);
 
     const result = response.choices[0].message.content;
     return NextResponse.json({ result });

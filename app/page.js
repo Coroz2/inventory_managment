@@ -72,6 +72,30 @@ const lightTheme = createTheme({
   },
 });
 
+const RecipeDisplay = ({ recipe }) => {
+  return (
+    <Box
+      width="80%"
+      bgcolor="#ffffff"
+      borderRadius={8}
+      boxShadow={3}
+      p={4}
+      mt={4}
+      display="flex"
+      flexDirection="column"
+      alignItems="center"
+      gap={2}
+    >
+      <Typography variant="h5" color="text.primary" textAlign="center" fontWeight="bold">
+        Suggested Recipe
+      </Typography>
+      <Typography variant="body1" color="text.primary">
+        {recipe}
+      </Typography>
+    </Box>
+  );
+};
+
 export default function Home() {
   const [inventory, setInventory] = useState([]);
   const [open, setOpen] = useState(false);
@@ -80,6 +104,7 @@ export default function Home() {
   const cameraRef = useRef(null);
   const [image, setImage] = useState(null);
   const [isCameraOpen, setIsCameraOpen] = useState(false);
+  const [recipe, setRecipe] = useState(null);
 
   const updateInventory = async () => {
     const snapshot = query(collection(firestore, 'inventory'));
@@ -129,17 +154,21 @@ export default function Home() {
   );
 
   const sendMessageToOpenAI = async () => {
+    const ingredientsList = inventory.map(item => item.name).join(", ");
+    const userMessage = `Here is the list of items in my pantry: ${ingredientsList}. Can you suggest a recipe using these ingredients? Respond with a just the recipe do not make it seem like you are talking to me.`;
+
     try {
-      const response = await fetch('/api/openai', { // Corrected the endpoint path
+      const response = await fetch('/api/openai', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ messages: [{ role: 'user', content: 'hi' }] }),
+        body: JSON.stringify({ messages: [{ role: 'user', content: userMessage }] }),
       });
-  
+
       const data = await response.json();
       console.log('Response from OpenAI:', data);
+      setRecipe(data.result);
     } catch (error) {
       console.error(error);
     }
@@ -313,8 +342,9 @@ export default function Home() {
         </Box>
         {image && <img src={image} alt="Taken photo" />}
         <Button variant="contained" onClick={sendMessageToOpenAI}>
-          Send Hi to OpenAI
+          Get Recipe from OpenAI
         </Button>
+        {recipe && <RecipeDisplay recipe={recipe} />}
       </Box>
     </ThemeProvider>
   );
