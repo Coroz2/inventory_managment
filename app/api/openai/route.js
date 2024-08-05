@@ -12,6 +12,7 @@ export async function POST(req) {
       model: "gpt-3.5-turbo",
       messages: messages,
     });
+    
 
     console.log('OpenAI Response:', response);
 
